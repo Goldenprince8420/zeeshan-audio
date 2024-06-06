@@ -1,0 +1,12 @@
+.idea
+.ipynb_checkpoints
+AudioMNIST
+venv
+notes_for_paper.txt
+Proposed_Ideas.txt
+rough.py
+rough2.py
+model.ipynb
+new_model.ipynb
+analysis.ipynb
+information.txt
