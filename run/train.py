@@ -79,7 +79,26 @@ def do_train(dataloader,
 
             generator_loss = GeneratorLoss()
             discriminator_loss = DiscriminatorLoss()
+            optimizer_G = torch.optim.Adam(generator.parameters(),
+                                           lr=run_config["generator_learning_rate"],
+                                           betas=(0.5, 0.999))
+            optimizer_D = torch.optim.Adam(discriminator.parameters(),
+                                           lr=run_config["discriminator_learning_rate"],
+                                           betas=(0.5, 0.999))
 
+            # Train Discriminator
+            optimizer_D.zero_grad()
+
+            # Calculate the discriminator loss
+            disc_loss = discriminator_loss(discriminator_output_msd_generated,
+                                           discriminator_output_msd_real,
+                                           discriminator_output_mcd_generated,
+                                           discriminator_output_mcd_generated)
+            disc_loss.backward()
+            optimizer_D.step()
+
+            # Train the Generator
+            optimizer_G.zero_grad()
             # Calculate the generator loss
             gen_loss = generator_loss(real_audio,
                                       generated_audio,
@@ -93,14 +112,10 @@ def do_train(dataloader,
                                       discriminator_output_mcd_initiator_features_real,
                                       discriminator_output_mcd_convolver_features_generated,
                                       discriminator_output_mcd_convolver_features_real)
-            print(f"Generator Loss: {gen_loss.item()}")
-
-            # Calculate the discriminator loss
-            disc_loss = discriminator_loss(discriminator_output_msd_generated,
-                                           discriminator_output_msd_real,
-                                           discriminator_output_mcd_generated,
-                                           discriminator_output_mcd_generated)
-            print(f"Discriminator Loss: {disc_loss.item()}")
+            # BackProp
+            gen_loss.backward()
+            # Update Optimizer
+            optimizer_G.step()
 
             break
         break
