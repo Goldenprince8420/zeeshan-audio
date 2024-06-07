@@ -36,10 +36,40 @@ def do_train(dataloader,
 
             discriminator = Discriminator(params=params_discriminator)
 
-            discriminator_output_msd_generated, discriminator_output_mcd_generated = discriminator(generated_audio)
-            # discriminator_output_msd_real, discriminator_output_mcd_real = discriminator(real_audio)
+            discriminator_output_msd_generated, \
+            discriminator_output_mcd_generated, \
+            discriminator_output_msd_features_generated, \
+            discriminator_output_mcd_features_generated = discriminator(generated_audio)
+
+            discriminator_output_msd_initiator_features_generated = discriminator_output_msd_features_generated[0]
+            discriminator_output_msd_distributor_features_generated = discriminator_output_msd_features_generated[1]
+
+            discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_features_generated[0]
+            discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_features_generated[1]
+
+            # discriminator_output_msd_real, \
+            # discriminator_output_mcd_real, \
+            # discriminator_output_msd_features_real, \
+            # discriminator_output_mcd_features_real = discriminator(real_audio)
+            #
+            # discriminator_output_msd_initiator_features_real = discriminator_output_msd_features_real[0]
+            # discriminator_output_msd_distributor_features_real = discriminator_output_msd_features_real[1]
+            #
+            # discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_features_real[0]
+            # discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_features_real[1]
+
             discriminator_output_msd_real = torch.randn(discriminator_output_msd_generated.shape)
             discriminator_output_mcd_real = torch.randn(discriminator_output_mcd_generated.shape)
+
+            discriminator_output_msd_initiator_features_real = torch.randn(
+                discriminator_output_msd_initiator_features_generated.shape)
+            discriminator_output_msd_distributor_features_real = torch.randn(
+                discriminator_output_msd_distributor_features_generated.shape)
+
+            discriminator_output_mcd_initiator_features_real = torch.randn(
+                discriminator_output_mcd_initiator_features_generated.shape)
+            discriminator_output_mcd_convolver_features_real = torch.randn(
+                discriminator_output_mcd_convolver_features_generated.shape)
 
             # print(discriminator_output_msd_generated.dtype)
             # print(discriminator_output_msd_real.shape)
@@ -47,14 +77,22 @@ def do_train(dataloader,
             print("MSD Output shape: ", discriminator_output_msd_generated.shape)
             print("MCD Output shape: ", discriminator_output_mcd_generated.shape)
 
-            generator_loss = GeneratorLoss(discriminator=discriminator)
+            generator_loss = GeneratorLoss()
             discriminator_loss = DiscriminatorLoss()
 
             # Calculate the generator loss
             gen_loss = generator_loss(real_audio,
                                       generated_audio,
                                       discriminator_output_msd_generated,
-                                      discriminator_output_mcd_generated)
+                                      discriminator_output_mcd_generated,
+                                      discriminator_output_msd_initiator_features_generated,
+                                      discriminator_output_msd_initiator_features_real,
+                                      discriminator_output_msd_distributor_features_generated,
+                                      discriminator_output_msd_distributor_features_real,
+                                      discriminator_output_mcd_initiator_features_generated,
+                                      discriminator_output_mcd_initiator_features_real,
+                                      discriminator_output_mcd_convolver_features_generated,
+                                      discriminator_output_mcd_convolver_features_real)
             print(f"Generator Loss: {gen_loss.item()}")
 
             # Calculate the discriminator loss

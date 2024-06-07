@@ -131,9 +131,11 @@ class SubMSD(nn.Module):
 
     def forward(self, x):
         x = self.initiator(x)
+        initiator_op = x
         x = self.distributor(x)
+        distributor_op = x
         x = self.final(x)
-        return x
+        return x, initiator_op, distributor_op
 
 
 class MSD(nn.Module):
@@ -146,13 +148,22 @@ class MSD(nn.Module):
 
     def forward(self, x):
         outs = []
+        initiators = []
+        distributors = []
+
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
             submsd_layer = SubMSD(params=self.params)
-            out = submsd_layer(x)
+            out, initiator_op, distributor_op = submsd_layer(x)
             outs.append(out)
+            initiators.append(initiator_op)
+            # print(distributor_op.shape)
+            distributors.append(distributor_op)
+
         x = torch.cat(outs, dim=1)
-        return x
+        initiator_output = torch.cat(initiators, dim=0)
+        distributor_output = torch.cat(distributors, dim=1)
+        return x, initiator_output, distributor_output
 
 
 class MCDInitiator(nn.Module):
@@ -227,7 +238,9 @@ class SubMCD(nn.Module):
 
     def forward(self, x):
         x = self.initiator(x)
+        initiator_op = x
         x = self.convolver(x)
+        convolver_op = x
 
         # Final Config
         self.final_params["in_features"] = x.shape[1] * x.shape[2] * x.shape[3]
@@ -235,7 +248,7 @@ class SubMCD(nn.Module):
 
         x = self.final(x)
         x = torch.unsqueeze(x, dim=1)
-        return x
+        return x, initiator_op, convolver_op
 
 
 class MCD(nn.Module):
@@ -248,10 +261,17 @@ class MCD(nn.Module):
 
     def forward(self, x):
         outs = []
+        initiators = []
+        convolvers = []
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
             submcd_layer = SubMCD(params=self.params)
-            out = submcd_layer(x)
+            out, initiator_op, convolver_op = submcd_layer(x)
             outs.append(out)
+            initiators.append(initiator_op)
+            convolvers.append(convolver_op)
+            # print(convolver_op.shape)
         x = torch.cat(outs, dim=1)
-        return x
+        initiator_output = torch.cat(initiators, dim=0)
+        convolver_output = torch.cat(convolvers, dim=1)
+        return x, initiator_output, convolver_output

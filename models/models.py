@@ -82,13 +82,9 @@ class Discriminator(nn.Module):
         self.mcd = MCD(params=self.mcd_params)
 
     def forward(self, x):
-        x_msd = self.msd(x)
-        x_mcd = self.mcd(x)
-        return x_msd, x_mcd
-
-    def extract_features(self, x):
-        pass
-
+        x_msd, x_initiators_msd, x_distributors_msd = self.msd(x)
+        x_mcd, x_initiators_mcd, x_convolvers_mcd = self.mcd(x)
+        return x_msd, x_mcd, [x_initiators_msd, x_distributors_msd], [x_initiators_mcd, x_convolvers_mcd]
 
 
 if __name__ == "__main__":
@@ -228,4 +224,3 @@ if __name__ == "__main__":
     discriminator_output_msd, discriminator_output_mcd = discriminator_model(generated_samples)
     print("Discriminator MSD Output Shape: ", discriminator_output_msd.shape)
     print("Discriminator MCD Output Shape: ", discriminator_output_mcd.shape)
-

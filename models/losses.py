@@ -32,17 +32,27 @@ class MelSpectrogramLoss(nn.Module):
 
 
 class FeatureMatchingLoss(nn.Module):
-    def __init__(self, discriminator):
+    def __init__(self):
         super(FeatureMatchingLoss, self).__init__()
-        self.discriminator = discriminator
 
-    def forward(self, real, fake):
-        real_features = self.discriminator.extract_features(real)
-        fake_features = self.discriminator.extract_features(fake)
-        loss = 0
-        for real_feat, fake_feat in zip(real_features, fake_features):
-            loss += F.mse_loss(real_feat, fake_feat)
-        return loss
+    def forward(self,
+                discriminator_output_msd_initiator_features_generated,
+                discriminator_output_msd_initiator_features_real,
+                discriminator_output_msd_distributor_features_generated,
+                discriminator_output_msd_distributor_features_real,
+                discriminator_output_mcd_initiator_features_generated,
+                discriminator_output_mcd_initiator_features_real,
+                discriminator_output_mcd_convolver_features_generated,
+                discriminator_output_mcd_convolver_features_real):
+        loss_discriminator_output_msd_initiator_features = F.mse_loss(discriminator_output_msd_initiator_features_generated, discriminator_output_msd_initiator_features_real)
+        loss_discriminator_output_msd_distributor_features = F.mse_loss(discriminator_output_msd_distributor_features_generated, discriminator_output_msd_distributor_features_real)
+        loss_discriminator_output_mcd_initiator_features = F.mse_loss(discriminator_output_mcd_initiator_features_generated, discriminator_output_mcd_initiator_features_real)
+        loss_discriminator_output_mcd_convolver_features = F.mse_loss(discriminator_output_mcd_convolver_features_generated, discriminator_output_mcd_convolver_features_real)
+
+        loss_discriminator_msd_feature = loss_discriminator_output_msd_initiator_features + loss_discriminator_output_msd_distributor_features
+        loss_discriminator_mcd_feature = loss_discriminator_output_mcd_initiator_features + loss_discriminator_output_mcd_convolver_features
+        feature_loss = loss_discriminator_msd_feature + loss_discriminator_mcd_feature
+        return feature_loss
 
 
 def create_discriminator_labels_gen(disc_op):
@@ -60,11 +70,11 @@ def create_discriminator_labels_gen(disc_op):
 
 
 class GeneratorLoss(nn.Module):
-    def __init__(self, discriminator):
+    def __init__(self):
         super(GeneratorLoss, self).__init__()
         self.adversarial_loss = AdversarialLoss()
         self.mel_loss = MelSpectrogramLoss()
-        self.feature_matching_loss = FeatureMatchingLoss(discriminator)
+        self.feature_matching_loss = FeatureMatchingLoss()
         self.lambda_fm = 2
         self.lambda_mel = 45
 
@@ -72,7 +82,15 @@ class GeneratorLoss(nn.Module):
                 real_audio,
                 fake_audio,
                 discriminator_output_msd_generated,
-                discriminator_output_mcd_generated):
+                discriminator_output_mcd_generated,
+                discriminator_output_msd_initiator_features_generated,
+                discriminator_output_msd_initiator_features_real,
+                discriminator_output_msd_distributor_features_generated,
+                discriminator_output_msd_distributor_features_real,
+                discriminator_output_mcd_initiator_features_generated,
+                discriminator_output_mcd_initiator_features_real,
+                discriminator_output_mcd_convolver_features_generated,
+                discriminator_output_mcd_convolver_features_real):
         # Creatng MCD Labels
         discriminator_output_msd_generated_label = create_discriminator_labels_gen(discriminator_output_msd_generated)
         discriminator_output_mcd_generated_label = create_discriminator_labels_gen(discriminator_output_mcd_generated)
@@ -83,7 +101,14 @@ class GeneratorLoss(nn.Module):
                                                             discriminator_output_mcd_generated_label)
         adv_loss = adv_loss_disc_msd_generated + adv_loss_disc_mcd_generated
         mel_loss = self.mel_loss(fake_audio, real_audio)
-        fm_loss = self.feature_matching_loss(real_audio, fake_audio)
+        fm_loss = self.feature_matching_loss(discriminator_output_msd_initiator_features_generated,
+                                             discriminator_output_msd_initiator_features_real,
+                                             discriminator_output_msd_distributor_features_generated,
+                                             discriminator_output_msd_distributor_features_real,
+                                             discriminator_output_mcd_initiator_features_generated,
+                                             discriminator_output_mcd_initiator_features_real,
+                                             discriminator_output_mcd_convolver_features_generated,
+                                             discriminator_output_mcd_convolver_features_real)
         return adv_loss + self.lambda_fm * fm_loss + self.lambda_mel * mel_loss
 
 
