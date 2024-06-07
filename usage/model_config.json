@@ -28,7 +28,7 @@
                     "kernel_size": 3,
                     "kernel_list": [3, 5],
                     "stride": 1,
-                    "depth": 4
+                    "depth": 2
                 },
                 "params_final_msd": {
                     "kernel_size": 7,
@@ -47,7 +47,7 @@
                     "kernel_size": 3,
                     "kernel_list": [3, 5],
                     "stride": 1,
-                    "depth": 3
+                    "depth": 2
                 },
                 "final_params": {
                     "in_features": 0,

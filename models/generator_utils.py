@@ -16,19 +16,18 @@ def deformconv(x, out_channels, kernel_size):
     mel_timeframes = x.shape[3]
     padding = kernel_size // 2
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     pd = (padding, padding, padding, padding)  # pad last dim by 1 on each side
     x = F.pad(x, pd, "constant", 0)  # effectively zero padding
 
-    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size).to(device)
+    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size)
     offsets = offset_layer(x)
 
     # Output shape
     out_filters = x.shape[2] - kh + 1
     out_timeframes = x.shape[3] - kw + 1
 
-    weight = torch.rand(out_channels, mel_channels, kh, kw).to(device)
-    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes).to(device)
+    weight = torch.rand(out_channels, mel_channels, kh, kw)
+    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
 
     x = deform_conv2d(x, offsets, weight, mask=mask)
     x = F.layer_norm(x, normalized_shape=x.shape)
@@ -55,26 +54,26 @@ def dpn_resblock(x, out_channels, kernel_size):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size).to(device)
+    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size)
     offsets = offset_layer(x)
 
     # Output shape
     out_filters = x.shape[2] - kh + 1
     out_timeframes = x.shape[3] - kw + 1
 
-    weight = torch.rand(out_channels, mel_channels, kh, kw).to(device)
-    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes).to(device)
+    weight = torch.rand(out_channels, mel_channels, kh, kw)
+    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
 
     x = deform_conv2d(x, offsets, weight, mask=mask)
     x = F.layer_norm(x, normalized_shape=x.shape)
 
     # Activation
-    act = PRAK().to(device)
+    act = PRAK()
     x = act(x)
 
     x = torch.cat([x, x_addon], dim=1)
 
-    pool_layer = nn.MaxPool2d(kernel_size=kernel_size, stride=2).to(device)
+    pool_layer = nn.MaxPool2d(kernel_size=kernel_size, stride=2)
     x = pool_layer(x)
 
     return x
@@ -208,8 +207,8 @@ class Modulator(nn.Module):
         self.convt = nn.ConvTranspose2d(in_channels=self.convt_in_channels,
                                         out_channels=self.convt_out_channels,
                                         kernel_size=self.convt_kernel_size,
-                                        stride=2).to(self.device)
-        self.dpn = DPNBlock(params=params).to(self.device)
+                                        stride=2)
+        self.dpn = DPNBlock(params=params)
 
     def forward(self, x):
         x = self.convt(x)
@@ -233,21 +232,21 @@ class ProcessorBlock(nn.Module):
         self.kw = self.kernel_size
 
         # MaxPool Layer for Downsample
-        self.pool1 = nn.MaxPool2d(kernel_size=self.kernel_size, stride=2).to(self.device)
+        self.pool1 = nn.MaxPool2d(kernel_size=self.kernel_size, stride=2)
 
         # PRAK Activation
-        self.dropout = nn.Dropout(p=0.4).to(self.device)
-        self.prak = PRAK().to(self.device)
+        self.dropout = nn.Dropout(p=0.4)
+        self.prak = PRAK()
 
         # Point Convolution
         self.point_conv = None
 
         # PRAK 2
-        self.prak2 = PRAK().to(self.device)
+        self.prak2 = PRAK()
 
         # Output Layer
         self.dense2 = None
-        self.tanh = nn.Tanh().to(self.device)
+        self.tanh = nn.Tanh()
 
     def forward(self, x):
         # Deformable convolution 1
@@ -261,14 +260,14 @@ class ProcessorBlock(nn.Module):
         x = self.prak(x)
 
         # Point Convolution
-        self.point_conv = nn.Conv2d(in_channels=x.shape[1], out_channels=1, kernel_size=1, stride=1).to(self.device)
+        self.point_conv = nn.Conv2d(in_channels=x.shape[1], out_channels=1, kernel_size=1, stride=1)
         x = self.point_conv(x)
         x = self.prak2(x)
 
         # Flattening
         x = x.view(x.size(0), 1, -1)
 
-        self.dense2 = nn.Linear(in_features=x.shape[-1], out_features=self.out_seq_length).to(self.device)
+        self.dense2 = nn.Linear(in_features=x.shape[-1], out_features=self.out_seq_length)
         x = self.dense2(x)
         x = self.tanh(x)
 

@@ -8,7 +8,7 @@ import torchaudio
 class AdversarialLoss(nn.Module):
     def __init__(self):
         super(AdversarialLoss, self).__init__()
-        self.criterion = nn.BCELoss()
+        self.criterion = F.binary_cross_entropy_with_logits
 
     def forward(self, y_pred, y_true):
         loss = self.criterion(y_pred, y_true)
@@ -23,10 +23,11 @@ class MelSpectrogramLoss(nn.Module):
                                                                   hop_length=hop_length,
                                                                   n_mels=n_mels)
 
-    def forward(self, audio_seq, mel_spec_orig):
-        mel_spec_transform = self.mel_transform(audio_seq)
-        print(mel_spec_orig.shape, mel_spec_transform.shape)
-        loss = F.mse_loss(mel_spec_orig, mel_spec_transform)
+    def forward(self, real_audio_seq, fake_audio_seq):
+        real_mel_spec_transform = self.mel_transform(real_audio_seq)
+        fake_mel_spec_transform = self.mel_transform(fake_audio_seq)
+
+        loss = F.mse_loss(real_mel_spec_transform, fake_mel_spec_transform)
         return loss
 
 
@@ -44,6 +45,20 @@ class FeatureMatchingLoss(nn.Module):
         return loss
 
 
+def create_discriminator_labels_gen(disc_op):
+    # Creatng Labels
+    disc_op_label_ones = torch.ones(size=[disc_op.shape[0],
+                                          disc_op.shape[1], 1],
+                                    dtype=torch.long)
+    # Convert to one-hot encoding
+    disc_op_label = torch.zeros(disc_op.shape[0],
+                                disc_op.shape[1],
+                                2)
+    # Scatter the ones to the appropriate locations
+    disc_op_label.scatter_(2, disc_op_label_ones, 1)
+    return disc_op_label
+
+
 class GeneratorLoss(nn.Module):
     def __init__(self, discriminator):
         super(GeneratorLoss, self).__init__()
@@ -53,11 +68,52 @@ class GeneratorLoss(nn.Module):
         self.lambda_fm = 2
         self.lambda_mel = 45
 
-    def forward(self, real_audio, fake_audio, mel_spec_orig, disc_fake):
-        adv_loss = self.adversarial_loss(disc_fake, torch.ones_like(disc_fake))
-        mel_loss = self.mel_loss(fake_audio, mel_spec_orig)
+    def forward(self,
+                real_audio,
+                fake_audio,
+                discriminator_output_msd_generated,
+                discriminator_output_mcd_generated):
+        # Creatng MCD Labels
+        discriminator_output_msd_generated_label = create_discriminator_labels_gen(discriminator_output_msd_generated)
+        discriminator_output_mcd_generated_label = create_discriminator_labels_gen(discriminator_output_mcd_generated)
+
+        adv_loss_disc_msd_generated = self.adversarial_loss(discriminator_output_msd_generated,
+                                                            discriminator_output_msd_generated_label)
+        adv_loss_disc_mcd_generated = self.adversarial_loss(discriminator_output_mcd_generated,
+                                                            discriminator_output_mcd_generated_label)
+        adv_loss = adv_loss_disc_msd_generated + adv_loss_disc_mcd_generated
+        mel_loss = self.mel_loss(fake_audio, real_audio)
         fm_loss = self.feature_matching_loss(real_audio, fake_audio)
         return adv_loss + self.lambda_fm * fm_loss + self.lambda_mel * mel_loss
+
+
+def create_discriminator_label_disc(disc_op, type):
+    if type == "generated":
+        disc_op_label_zeros = torch.zeros(size=[disc_op.shape[0],
+                                                disc_op.shape[1],
+                                                1],
+                                          dtype=torch.long)
+        disc_op_label = torch.ones(disc_op.shape[0],
+                                   disc_op.shape[1],
+                                   2)
+        disc_op_label.scatter_(2, disc_op_label_zeros, 1)
+
+    elif type == "real":
+        # Creatng Labels
+        disc_op_label_ones = torch.ones(size=[disc_op.shape[0],
+                                              disc_op.shape[1],
+                                              1],
+                                        dtype=torch.long)
+        # Convert to one-hot encoding
+        disc_op_label = torch.zeros(disc_op.shape[0],
+                                    disc_op.shape[1],
+                                    2)
+
+        # Scatter the ones to the appropriate locations
+        disc_op_label.scatter_(2, disc_op_label_ones, 1)
+    else:
+        return -1
+    return disc_op_label
 
 
 class DiscriminatorLoss(nn.Module):
@@ -65,10 +121,33 @@ class DiscriminatorLoss(nn.Module):
         super(DiscriminatorLoss, self).__init__()
         self.adversarial_loss = AdversarialLoss()
 
-    def forward(self, disc_real, disc_fake):
-        real_loss = self.adversarial_loss(disc_real, torch.ones_like(disc_real))
-        fake_loss = self.adversarial_loss(disc_fake, torch.zeros_like(disc_fake))
-        return real_loss + fake_loss
+    def forward(self,
+                discriminator_output_msd_generated,
+                discriminator_output_msd_real,
+                discriminator_output_mcd_generated,
+                discriminator_output_mcd_real):
+        discriminator_output_msd_generated_label = create_discriminator_label_disc(discriminator_output_msd_generated,
+                                                                                   type="generated")
+        discriminator_output_msd_real_label = create_discriminator_label_disc(discriminator_output_msd_real,
+                                                                              type="real")
+        discriminator_output_mcd_generated_label = create_discriminator_label_disc(discriminator_output_mcd_generated,
+                                                                                   type="generated")
+        discriminator_output_mcd_real_label = create_discriminator_label_disc(discriminator_output_mcd_real,
+                                                                              type="real")
+
+        msd_loss_generated = self.adversarial_loss(discriminator_output_msd_generated,
+                                                   discriminator_output_msd_generated_label)
+        msd_loss_real = self.adversarial_loss(discriminator_output_msd_real,
+                                              discriminator_output_msd_real_label)
+        msd_loss = msd_loss_real + msd_loss_generated
+
+        mcd_loss_generated = self.adversarial_loss(discriminator_output_mcd_generated,
+                                                   discriminator_output_mcd_generated_label)
+        mcd_loss_real = self.adversarial_loss(discriminator_output_mcd_real,
+                                              discriminator_output_mcd_real_label)
+        mcd_loss = mcd_loss_real + mcd_loss_generated
+
+        return msd_loss + mcd_loss
 
 
 # Mock discriminator class for feature extraction

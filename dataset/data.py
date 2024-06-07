@@ -51,8 +51,8 @@ if __name__ == "__main__":
 
     for i, (real_audio, meta, labels, mel_spec, mel_spec_db) in enumerate(audiomnist_dataloader):
         # Move data to device
-        real_audio = real_audio.to(device)
-        labels = labels.to(device)
+        real_audio = real_audio
+        labels = labels
 
         print(real_audio.shape)
         print(labels.shape)

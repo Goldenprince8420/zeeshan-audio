@@ -11,7 +11,7 @@ def do_train(dataloader,
              output_config,
              do_save=False):
     epochs = run_config["epochs"]
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device = torch.device('cpu')
     params_generator = model_config["generator_params"]
     params_discriminator = model_config["discriminator_params"]
@@ -23,20 +23,46 @@ def do_train(dataloader,
                 mel_spec,
                 mel_spec_db) in enumerate(dataloader):
             # Move data to device
-            real_audio = real_audio.to(device)
+            real_audio = real_audio
             real_audio = real_audio.transpose(1, 2)
 
-            x_mel = torch.unsqueeze(mel_spec.to(device), dim=1)
-            x_meta = meta.transpose(1, 2).to(device).to(torch.float32)
+            x_mel = torch.unsqueeze(mel_spec, dim=1)
+            x_meta = meta.transpose(1, 2).to(torch.float32)
 
-            generator = Generator(params=params_generator).to(device)
+            generator = Generator(params=params_generator)
 
             generated_audio = generator(x_mel, x_meta)
+            print("Generated Audio Shape: ", generated_audio.shape)
 
-            discriminator = Discriminator(params=params_discriminator).to(device)
+            discriminator = Discriminator(params=params_discriminator)
 
-            discriminator_output_msd_fake, discriminator_output_mcd_fake = discriminator(generated_audio)
-            discriminator_output_msd_real, discriminator_output_mcd_real = discriminator(real_audio)
+            discriminator_output_msd_generated, discriminator_output_mcd_generated = discriminator(generated_audio)
+            # discriminator_output_msd_real, discriminator_output_mcd_real = discriminator(real_audio)
+            discriminator_output_msd_real = torch.randn(discriminator_output_msd_generated.shape)
+            discriminator_output_mcd_real = torch.randn(discriminator_output_mcd_generated.shape)
+
+            # print(discriminator_output_msd_generated.dtype)
+            # print(discriminator_output_msd_real.shape)
+
+            print("MSD Output shape: ", discriminator_output_msd_generated.shape)
+            print("MCD Output shape: ", discriminator_output_mcd_generated.shape)
+
+            generator_loss = GeneratorLoss(discriminator=discriminator)
+            discriminator_loss = DiscriminatorLoss()
+
+            # Calculate the generator loss
+            gen_loss = generator_loss(real_audio,
+                                      generated_audio,
+                                      discriminator_output_msd_generated,
+                                      discriminator_output_mcd_generated)
+            print(f"Generator Loss: {gen_loss.item()}")
+
+            # Calculate the discriminator loss
+            disc_loss = discriminator_loss(discriminator_output_msd_generated,
+                                           discriminator_output_msd_real,
+                                           discriminator_output_mcd_generated,
+                                           discriminator_output_mcd_generated)
+            print(f"Discriminator Loss: {disc_loss.item()}")
 
             break
         break
@@ -45,7 +71,7 @@ def do_train(dataloader,
 if __name__ == "__main__":
     # Data Preparation
     data_params = {
-        "batch_size": 16,
+        "batch_size": 2,
         "num_channels": 1,
         "mel_filters": 128,
         "timeframes": 100,
@@ -131,7 +157,6 @@ if __name__ == "__main__":
     discriminator_params = params["discriminator_params"]
 
     # Define model and input parameters
-    batch_size = 16
     input_size = 10  # Input size
 
     # Generate random input

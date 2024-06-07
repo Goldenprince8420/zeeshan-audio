@@ -86,6 +86,10 @@ class Discriminator(nn.Module):
         x_mcd = self.mcd(x)
         return x_msd, x_mcd
 
+    def extract_features(self, x):
+        pass
+
+
 
 if __name__ == "__main__":
     # Generator

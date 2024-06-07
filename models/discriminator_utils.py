@@ -8,22 +8,22 @@ from models.generator_utils import DeConv1d, PRAK, dpn_resblock
 def msd_rescaling_layer(x, out_channels, kernel_size, padding, stride):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     x_addon = x
-    offsets = torch.randn(x.shape[0], 1, x.shape[-1] + 2 * padding - kernel_size + 1, kernel_size).to(device)
+    offsets = torch.randn(x.shape[0], 1, x.shape[-1] + 2 * padding - kernel_size + 1, kernel_size)
     defconv1d = DeConv1d(in_channels=x.shape[1],
                          out_channels=out_channels,
                          kernel_size=kernel_size,
                          padding=padding,
-                         stride=stride).to(device)
+                         stride=stride)
     x = defconv1d(x, offsets)
 
-    x = F.layer_norm(x, normalized_shape=x.shape).to(device)
+    x = F.layer_norm(x, normalized_shape=x.shape)
 
     pool1 = nn.MaxPool1d(kernel_size=kernel_size,
                          stride=stride,
-                         padding=padding).to(device)
+                         padding=padding)
     x = pool1(x)
 
-    prak1 = PRAK().to(device)
+    prak1 = PRAK()
     x = prak1(x)
 
     x = torch.cat([x, x_addon], dim=1)
@@ -83,24 +83,24 @@ class MSDFinal(nn.Module):
         self.stride = self.params["stride"]
         self.hidden_dims = self.params["hidden_dims"]
 
-        self.flatten = nn.Flatten().to(self.device)
-        self.avgpool1d = nn.AvgPool1d(kernel_size=self.kernel_size, stride=self.stride).to(self.device)
+        self.flatten = nn.Flatten()
+        self.avgpool1d = nn.AvgPool1d(kernel_size=self.kernel_size, stride=self.stride)
 
         self.dense1 = None
-        self.act1 = nn.ReLU().to(self.device)
-        self.dense2 = nn.Linear(in_features=self.hidden_dims * 4, out_features=self.hidden_dims).to(self.device)
-        self.act2 = nn.ReLU().to(self.device)
-        self.dense3 = nn.Linear(in_features=self.hidden_dims, out_features=self.hidden_dims // 4).to(self.device)
-        self.act3 = nn.ReLU().to(self.device)
-        self.dense4 = nn.Linear(in_features=self.hidden_dims // 4, out_features=2).to(self.device)
-        self.out_activation = nn.Sigmoid().to(self.device)
+        self.act1 = nn.ReLU()
+        self.dense2 = nn.Linear(in_features=self.hidden_dims * 4, out_features=self.hidden_dims)
+        self.act2 = nn.ReLU()
+        self.dense3 = nn.Linear(in_features=self.hidden_dims, out_features=self.hidden_dims // 4)
+        self.act3 = nn.ReLU()
+        self.dense4 = nn.Linear(in_features=self.hidden_dims // 4, out_features=2)
+        self.out_activation = nn.Sigmoid()
 
     def forward(self, x):
         x = self.flatten(x)
         x = x.reshape(x.shape[0], 1, -1)
         x = self.avgpool1d(x)
 
-        self.dense1 = nn.Linear(in_features=x.shape[-1], out_features=self.hidden_dims * 4).to(self.device)
+        self.dense1 = nn.Linear(in_features=x.shape[-1], out_features=self.hidden_dims * 4)
 
         x = self.dense1(x)
         x = self.act1(x)
@@ -125,9 +125,9 @@ class SubMSD(nn.Module):
         self.distributor_params = params["params_distributor"]
         self.final_params = params["params_final_msd"]
 
-        self.initiator = MSDInitiator(params=self.avgpool_params).to(self.device)
-        self.distributor = Distributor(params=self.distributor_params).to(self.device)
-        self.final = MSDFinal(params=self.final_params).to(self.device)
+        self.initiator = MSDInitiator(params=self.avgpool_params)
+        self.distributor = Distributor(params=self.distributor_params)
+        self.final = MSDFinal(params=self.final_params)
 
     def forward(self, x):
         x = self.initiator(x)
@@ -148,7 +148,7 @@ class MSD(nn.Module):
         outs = []
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
-            submsd_layer = SubMSD(params=self.params).to(self.device)
+            submsd_layer = SubMSD(params=self.params)
             out = submsd_layer(x)
             outs.append(out)
         x = torch.cat(outs, dim=1)
@@ -221,8 +221,8 @@ class SubMCD(nn.Module):
         self.convolver_params = self.params["convolver_params"]
         self.final_params = self.params["final_params"]
 
-        self.initiator = MCDInitiator(params=self.initiator_params).to(self.device)
-        self.convolver = Convolver(params=self.convolver_params).to(self.device)
+        self.initiator = MCDInitiator(params=self.initiator_params)
+        self.convolver = Convolver(params=self.convolver_params)
         self.final = None
 
     def forward(self, x):
@@ -231,7 +231,7 @@ class SubMCD(nn.Module):
 
         # Final Config
         self.final_params["in_features"] = x.shape[1] * x.shape[2] * x.shape[3]
-        self.final = MCDFinal(params=self.final_params).to(self.device)
+        self.final = MCDFinal(params=self.final_params)
 
         x = self.final(x)
         x = torch.unsqueeze(x, dim=1)
@@ -250,7 +250,7 @@ class MCD(nn.Module):
         outs = []
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
-            submcd_layer = SubMCD(params=self.params).to(self.device)
+            submcd_layer = SubMCD(params=self.params)
             out = submcd_layer(x)
             outs.append(out)
         x = torch.cat(outs, dim=1)
