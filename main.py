@@ -45,6 +45,7 @@ def run(args):
 
     do_train(dataloader=audio_dataloader,
              run_config=run_config,
+             data_config=data_config,
              model_config=model_config,
              output_config=output_config,
              do_save=do_save)

@@ -7,14 +7,35 @@ from models.losses import GeneratorLoss, DiscriminatorLoss
 
 def do_train(dataloader,
              run_config,
+             data_config,
              model_config,
              output_config,
              do_save=False):
     epochs = run_config["epochs"]
+    batch_size = data_config["batch_size"]
+    audio_length = data_config["audio_length"]
+
+    rand_tensor = torch.randn([batch_size, 1, audio_length])
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device = torch.device('cpu')
     params_generator = model_config["generator_params"]
     params_discriminator = model_config["discriminator_params"]
+
+    generator = Generator(params=params_generator)
+
+    discriminator = Discriminator(params=params_discriminator)
+    discriminator(rand_tensor)
+
+    generator_loss = GeneratorLoss(discriminator=discriminator)
+    discriminator_loss = DiscriminatorLoss()
+
+    optimizer_G = torch.optim.Adam(generator.parameters(),
+                                   lr=run_config["generator_learning_rate"],
+                                   betas=(0.5, 0.999))
+
+    optimizer_D = torch.optim.Adam(discriminator.parameters(),
+                                   lr=run_config["discriminator_learning_rate"],
+                                   betas=(0.5, 0.999))
 
     for epoch in range(epochs):
         for i, (real_audio,
@@ -29,62 +50,63 @@ def do_train(dataloader,
             x_mel = torch.unsqueeze(mel_spec, dim=1)
             x_meta = meta.transpose(1, 2).to(torch.float32)
 
-            generator = Generator(params=params_generator)
-
             generated_audio = generator(x_mel, x_meta)
-            print("Generated Audio Shape: ", generated_audio.shape)
+            # print("Generated Audio Shape: ", generated_audio.shape)
 
-            discriminator = Discriminator(params=params_discriminator)
+            # Concatenate generated and real audio
+            combined_audio = torch.cat((generated_audio.detach(), real_audio.detach()), dim=0)
 
-            discriminator_output_msd_generated, \
-            discriminator_output_mcd_generated, \
-            discriminator_output_msd_features_generated, \
-            discriminator_output_mcd_features_generated = discriminator(generated_audio)
+            # Pass through the discriminator
+            combined_discriminator_output_msd, \
+            combined_discriminator_output_mcd, \
+            combined_discriminator_output_msd_features, \
+            combined_discriminator_output_mcd_features = discriminator(combined_audio)
 
-            # discriminator_output_msd_initiator_features_generated = discriminator_output_msd_features_generated[0]
-            # discriminator_output_msd_distributor_features_generated = discriminator_output_msd_features_generated[1]
-            #
-            # discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_features_generated[0]
-            # discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_features_generated[1]
-            #
-            # # discriminator_output_msd_real, \
-            # # discriminator_output_mcd_real, \
-            # # discriminator_output_msd_features_real, \
-            # # discriminator_output_mcd_features_real = discriminator(real_audio)
-            # #
-            # # discriminator_output_msd_initiator_features_real = discriminator_output_msd_features_real[0]
-            # # discriminator_output_msd_distributor_features_real = discriminator_output_msd_features_real[1]
-            # #
-            # # discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_features_real[0]
-            # # discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_features_real[1]
-            #
-            discriminator_output_msd_real = torch.randn(discriminator_output_msd_generated.shape)
-            discriminator_output_mcd_real = torch.randn(discriminator_output_mcd_generated.shape)
-            #
-            # discriminator_output_msd_initiator_features_real = torch.randn(
-            #     discriminator_output_msd_initiator_features_generated.shape)
-            # discriminator_output_msd_distributor_features_real = torch.randn(
-            #     discriminator_output_msd_distributor_features_generated.shape)
-            #
-            # discriminator_output_mcd_initiator_features_real = torch.randn(
-            #     discriminator_output_mcd_initiator_features_generated.shape)
-            # discriminator_output_mcd_convolver_features_real = torch.randn(
-            #     discriminator_output_mcd_convolver_features_generated.shape)
+            # Split the outputs
+            batch_size = real_audio.size(0)
+            discriminator_output_msd_generated = combined_discriminator_output_msd[:batch_size]
+            discriminator_output_msd_real = combined_discriminator_output_msd[batch_size:]
 
-            # print(discriminator_output_msd_generated.dtype)
-            # print(discriminator_output_msd_real.shape)
+            discriminator_output_mcd_generated = combined_discriminator_output_mcd[:batch_size]
+            discriminator_output_mcd_real = combined_discriminator_output_mcd[batch_size:]
 
-            print("MSD Output shape: ", discriminator_output_msd_generated.shape)
-            print("MCD Output shape: ", discriminator_output_mcd_generated.shape)
+            discriminator_output_msd_initiator_features_combined = combined_discriminator_output_msd_features[0]
+            discriminator_output_msd_distributor_features_combined = combined_discriminator_output_msd_features[1]
+            discriminator_output_mcd_initiator_features_combined = combined_discriminator_output_mcd_features[0]
+            discriminator_output_mcd_convolver_features_combined = combined_discriminator_output_mcd_features[1]
 
-            generator_loss = GeneratorLoss(discriminator=discriminator)
-            discriminator_loss = DiscriminatorLoss()
-            optimizer_G = torch.optim.Adam(list[generator.parameters()],
-                                           lr=run_config["generator_learning_rate"],
-                                           betas=(0.5, 0.999))
-            optimizer_D = torch.optim.Adam(list[discriminator.parameters()],
-                                           lr=run_config["discriminator_learning_rate"],
-                                           betas=(0.5, 0.999))
+            discriminator_output_msd_initiator_features_generated = discriminator_output_msd_initiator_features_combined[:batch_size]
+            discriminator_output_msd_initiator_features_real = discriminator_output_msd_initiator_features_combined[batch_size:]
+
+            discriminator_output_msd_distributor_features_generated = discriminator_output_msd_distributor_features_combined[:batch_size]
+            discriminator_output_msd_distributor_features_real = discriminator_output_msd_distributor_features_combined[batch_size:]
+
+            discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_initiator_features_combined[:batch_size]
+            discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_initiator_features_combined[batch_size:]
+
+            discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_convolver_features_combined[:batch_size]
+            discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_convolver_features_combined[batch_size:]
+
+            # Train the Generator
+            optimizer_G.zero_grad()
+            # Calculate the generator loss
+            gen_loss = generator_loss(real_audio,
+                                      generated_audio,
+                                      discriminator_output_msd_generated,
+                                      discriminator_output_mcd_generated,
+                                      discriminator_output_msd_initiator_features_generated,
+                                      discriminator_output_msd_distributor_features_generated,
+                                      discriminator_output_mcd_initiator_features_generated,
+                                      discriminator_output_mcd_convolver_features_generated,
+                                      discriminator_output_msd_initiator_features_real,
+                                      discriminator_output_msd_distributor_features_real,
+                                      discriminator_output_mcd_initiator_features_real,
+                                      discriminator_output_mcd_convolver_features_real)
+
+            # BackProp
+            gen_loss.backward(retain_graph=True)
+            # Update Optimizer
+            optimizer_G.step()
 
             # Train Discriminator
             optimizer_D.zero_grad()
@@ -96,17 +118,6 @@ def do_train(dataloader,
                                            discriminator_output_mcd_real)
             disc_loss.backward()
             optimizer_D.step()
-
-            # Train the Generator
-            optimizer_G.zero_grad()
-            # Calculate the generator loss
-            gen_loss = generator_loss(real_audio,
-                                      generated_audio)
-
-            # BackProp
-            gen_loss.backward(retain_graph=True)
-            # Update Optimizer
-            # optimizer_G.step()
 
             break
         break
@@ -222,7 +233,8 @@ if __name__ == "__main__":
 
     discriminator_model = Discriminator(params=discriminator_params)
 
-    discriminator_output_msd_generated, discriminator_output_mcd_generated = discriminator_model(generated_samples)
+    discriminator_output_msd_generated, discriminator_output_mcd_generated, \
+    discriminator_params_msd_generated, discriminator_params_mcd_generated = discriminator_model(generated_samples)
     discriminator_output_msd_real, discriminator_output_mcd_real = discriminator_output_msd_generated, discriminator_output_mcd_generated  # discriminator_model(generated_samples)
     print("Discriminator MSD Output Shape: ", discriminator_output_msd_generated.shape)
     print("Discriminator MCD Output Shape: ", discriminator_output_mcd_generated.shape)

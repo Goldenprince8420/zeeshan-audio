@@ -8,6 +8,7 @@ from models.generator_utils import DeConv1d, PRAK, DPNResBlock
 class MSDRescalingLayer(nn.Module):
     def __init__(self, out_channels, kernel_size, padding, stride):
         super(MSDRescalingLayer, self).__init__()
+        self.layer_norm = None
         self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.padding = padding
@@ -23,7 +24,8 @@ class MSDRescalingLayer(nn.Module):
                              stride=self.stride)
         x = defconv1d(x, offsets)
 
-        x = F.layer_norm(x, normalized_shape=x.shape)
+        self.layer_norm = nn.LayerNorm(normalized_shape=x.shape)
+        x = self.layer_norm(x)
 
         pool1 = nn.MaxPool1d(kernel_size=self.kernel_size,
                              stride=self.stride,
@@ -160,8 +162,8 @@ class MSD(nn.Module):
 
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
-            submsd_layer = SubMSD(params=self.params)
-            out, initiator_op, distributor_op = submsd_layer(x)
+            self.submsd_layer = SubMSD(params=self.params)
+            out, initiator_op, distributor_op = self.submsd_layer(x)
             outs.append(out)
             initiators.append(initiator_op)
             # print(distributor_op.shape)
@@ -275,8 +277,8 @@ class MCD(nn.Module):
         convolvers = []
         for kernel_size in self.kernel_list:
             self.params["kernel_size"] = kernel_size
-            submcd_layer = SubMCD(params=self.params)
-            out, initiator_op, convolver_op = submcd_layer(x)
+            self.submcd_layer = SubMCD(params=self.params)
+            out, initiator_op, convolver_op = self.submcd_layer(x)
             outs.append(out)
             initiators.append(initiator_op)
             convolvers.append(convolver_op)

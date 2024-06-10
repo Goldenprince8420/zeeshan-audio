@@ -45,6 +45,7 @@ class FeatureMatchingLoss(nn.Module):
                 discriminator_output_mcd_convolver_features_generated,
                 discriminator_output_mcd_convolver_features_real):
         loss_discriminator_output_msd_initiator_features = F.mse_loss(discriminator_output_msd_initiator_features_generated, discriminator_output_msd_initiator_features_real)
+        # print(discriminator_output_msd_distributor_features_generated.shape, discriminator_output_msd_distributor_features_real.shape)
         loss_discriminator_output_msd_distributor_features = F.mse_loss(discriminator_output_msd_distributor_features_generated, discriminator_output_msd_distributor_features_real)
         loss_discriminator_output_mcd_initiator_features = F.mse_loss(discriminator_output_mcd_initiator_features_generated, discriminator_output_mcd_initiator_features_real)
         loss_discriminator_output_mcd_convolver_features = F.mse_loss(discriminator_output_mcd_convolver_features_generated, discriminator_output_mcd_convolver_features_real)
@@ -72,7 +73,7 @@ def create_discriminator_labels_gen(disc_op):
 class GeneratorLoss(nn.Module):
     def __init__(self, discriminator):
         super(GeneratorLoss, self).__init__()
-        self.discriminator = discriminator
+        # self.discriminator = discriminator
         self.adversarial_loss = AdversarialLoss()
         self.mel_loss = MelSpectrogramLoss()
         self.feature_matching_loss = FeatureMatchingLoss()
@@ -81,42 +82,17 @@ class GeneratorLoss(nn.Module):
 
     def forward(self,
                 real_audio,
-                fake_audio):
-        # Generating other tensors
-        discriminator_output_msd_generated, \
-        discriminator_output_mcd_generated, \
-        discriminator_output_msd_features_generated, \
-        discriminator_output_mcd_features_generated = self.discriminator(fake_audio)
-
-        discriminator_output_msd_initiator_features_generated = discriminator_output_msd_features_generated[0]
-        discriminator_output_msd_distributor_features_generated = discriminator_output_msd_features_generated[1]
-
-        discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_features_generated[0]
-        discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_features_generated[1]
-
-        # discriminator_output_msd_real, \
-        # discriminator_output_mcd_real, \
-        # discriminator_output_msd_features_real, \
-        # discriminator_output_mcd_features_real = discriminator(real_audio)
-        #
-        # discriminator_output_msd_initiator_features_real = discriminator_output_msd_features_real[0]
-        # discriminator_output_msd_distributor_features_real = discriminator_output_msd_features_real[1]
-        #
-        # discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_features_real[0]
-        # discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_features_real[1]
-
-        discriminator_output_msd_real = torch.randn(discriminator_output_msd_generated.shape)
-        discriminator_output_mcd_real = torch.randn(discriminator_output_mcd_generated.shape)
-
-        discriminator_output_msd_initiator_features_real = torch.randn(
-            discriminator_output_msd_initiator_features_generated.shape)
-        discriminator_output_msd_distributor_features_real = torch.randn(
-            discriminator_output_msd_distributor_features_generated.shape)
-
-        discriminator_output_mcd_initiator_features_real = torch.randn(
-            discriminator_output_mcd_initiator_features_generated.shape)
-        discriminator_output_mcd_convolver_features_real = torch.randn(
-            discriminator_output_mcd_convolver_features_generated.shape)
+                fake_audio,
+                discriminator_output_msd_generated,
+                discriminator_output_mcd_generated,
+                discriminator_output_msd_initiator_features_generated,
+                discriminator_output_msd_distributor_features_generated,
+                discriminator_output_mcd_initiator_features_generated,
+                discriminator_output_mcd_convolver_features_generated,
+                discriminator_output_msd_initiator_features_real,
+                discriminator_output_msd_distributor_features_real,
+                discriminator_output_mcd_initiator_features_real,
+                discriminator_output_mcd_convolver_features_real):
 
         # Creatng MCD Labels
         discriminator_output_msd_generated_label = create_discriminator_labels_gen(discriminator_output_msd_generated)

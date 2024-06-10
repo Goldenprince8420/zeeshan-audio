@@ -50,7 +50,7 @@ class AudioMNISTDataset(Dataset):
         # Extracting data
         metadata = data["metadata"]
         audio = data["audio"]
-        label = data["label"]
+        # label = data["label"]
         mel_spec = data["mel_spec"]
         mel_spec_db = data["mel_spec_db"]
 
