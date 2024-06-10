@@ -41,35 +41,35 @@ def do_train(dataloader,
             discriminator_output_msd_features_generated, \
             discriminator_output_mcd_features_generated = discriminator(generated_audio)
 
-            discriminator_output_msd_initiator_features_generated = discriminator_output_msd_features_generated[0]
-            discriminator_output_msd_distributor_features_generated = discriminator_output_msd_features_generated[1]
-
-            discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_features_generated[0]
-            discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_features_generated[1]
-
-            # discriminator_output_msd_real, \
-            # discriminator_output_mcd_real, \
-            # discriminator_output_msd_features_real, \
-            # discriminator_output_mcd_features_real = discriminator(real_audio)
+            # discriminator_output_msd_initiator_features_generated = discriminator_output_msd_features_generated[0]
+            # discriminator_output_msd_distributor_features_generated = discriminator_output_msd_features_generated[1]
             #
-            # discriminator_output_msd_initiator_features_real = discriminator_output_msd_features_real[0]
-            # discriminator_output_msd_distributor_features_real = discriminator_output_msd_features_real[1]
+            # discriminator_output_mcd_initiator_features_generated = discriminator_output_mcd_features_generated[0]
+            # discriminator_output_mcd_convolver_features_generated = discriminator_output_mcd_features_generated[1]
             #
-            # discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_features_real[0]
-            # discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_features_real[1]
-
+            # # discriminator_output_msd_real, \
+            # # discriminator_output_mcd_real, \
+            # # discriminator_output_msd_features_real, \
+            # # discriminator_output_mcd_features_real = discriminator(real_audio)
+            # #
+            # # discriminator_output_msd_initiator_features_real = discriminator_output_msd_features_real[0]
+            # # discriminator_output_msd_distributor_features_real = discriminator_output_msd_features_real[1]
+            # #
+            # # discriminator_output_mcd_initiator_features_real = discriminator_output_mcd_features_real[0]
+            # # discriminator_output_mcd_convolver_features_real = discriminator_output_mcd_features_real[1]
+            #
             discriminator_output_msd_real = torch.randn(discriminator_output_msd_generated.shape)
             discriminator_output_mcd_real = torch.randn(discriminator_output_mcd_generated.shape)
-
-            discriminator_output_msd_initiator_features_real = torch.randn(
-                discriminator_output_msd_initiator_features_generated.shape)
-            discriminator_output_msd_distributor_features_real = torch.randn(
-                discriminator_output_msd_distributor_features_generated.shape)
-
-            discriminator_output_mcd_initiator_features_real = torch.randn(
-                discriminator_output_mcd_initiator_features_generated.shape)
-            discriminator_output_mcd_convolver_features_real = torch.randn(
-                discriminator_output_mcd_convolver_features_generated.shape)
+            #
+            # discriminator_output_msd_initiator_features_real = torch.randn(
+            #     discriminator_output_msd_initiator_features_generated.shape)
+            # discriminator_output_msd_distributor_features_real = torch.randn(
+            #     discriminator_output_msd_distributor_features_generated.shape)
+            #
+            # discriminator_output_mcd_initiator_features_real = torch.randn(
+            #     discriminator_output_mcd_initiator_features_generated.shape)
+            # discriminator_output_mcd_convolver_features_real = torch.randn(
+            #     discriminator_output_mcd_convolver_features_generated.shape)
 
             # print(discriminator_output_msd_generated.dtype)
             # print(discriminator_output_msd_real.shape)
@@ -77,12 +77,12 @@ def do_train(dataloader,
             print("MSD Output shape: ", discriminator_output_msd_generated.shape)
             print("MCD Output shape: ", discriminator_output_mcd_generated.shape)
 
-            generator_loss = GeneratorLoss()
+            generator_loss = GeneratorLoss(discriminator=discriminator)
             discriminator_loss = DiscriminatorLoss()
-            optimizer_G = torch.optim.Adam(generator.parameters(),
+            optimizer_G = torch.optim.Adam(list[generator.parameters()],
                                            lr=run_config["generator_learning_rate"],
                                            betas=(0.5, 0.999))
-            optimizer_D = torch.optim.Adam(discriminator.parameters(),
+            optimizer_D = torch.optim.Adam(list[discriminator.parameters()],
                                            lr=run_config["discriminator_learning_rate"],
                                            betas=(0.5, 0.999))
 
@@ -93,7 +93,7 @@ def do_train(dataloader,
             disc_loss = discriminator_loss(discriminator_output_msd_generated,
                                            discriminator_output_msd_real,
                                            discriminator_output_mcd_generated,
-                                           discriminator_output_mcd_generated)
+                                           discriminator_output_mcd_real)
             disc_loss.backward()
             optimizer_D.step()
 
@@ -101,21 +101,12 @@ def do_train(dataloader,
             optimizer_G.zero_grad()
             # Calculate the generator loss
             gen_loss = generator_loss(real_audio,
-                                      generated_audio,
-                                      discriminator_output_msd_generated,
-                                      discriminator_output_mcd_generated,
-                                      discriminator_output_msd_initiator_features_generated,
-                                      discriminator_output_msd_initiator_features_real,
-                                      discriminator_output_msd_distributor_features_generated,
-                                      discriminator_output_msd_distributor_features_real,
-                                      discriminator_output_mcd_initiator_features_generated,
-                                      discriminator_output_mcd_initiator_features_real,
-                                      discriminator_output_mcd_convolver_features_generated,
-                                      discriminator_output_mcd_convolver_features_real)
+                                      generated_audio)
+
             # BackProp
-            gen_loss.backward()
+            gen_loss.backward(retain_graph=True)
             # Update Optimizer
-            optimizer_G.step()
+            # optimizer_G.step()
 
             break
         break

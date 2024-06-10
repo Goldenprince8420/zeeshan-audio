@@ -8,75 +8,87 @@ from torchvision.ops import deform_conv2d
 from deconv1d.nn import DeformConv1d
 
 
-def deformconv(x, out_channels, kernel_size):
-    batch_size = x.shape[0]
-    in_channels = x.shape[1]
-    kh = kw = kernel_size
-    mel_channels = x.shape[1]
-    mel_timeframes = x.shape[3]
-    padding = kernel_size // 2
+class DeformConvCustom(nn.Module):
+    def __init__(self, out_channels, kernel_size):
+        super(DeformConvCustom, self).__init__()
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
 
-    pd = (padding, padding, padding, padding)  # pad last dim by 1 on each side
-    x = F.pad(x, pd, "constant", 0)  # effectively zero padding
+    def forward(self, x):
+        batch_size = x.shape[0]
+        in_channels = x.shape[1]
+        kh = kw = self.kernel_size
+        mel_channels = x.shape[1]
+        mel_timeframes = x.shape[3]
+        padding = self.kernel_size // 2
 
-    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size)
-    offsets = offset_layer(x)
+        pd = (padding, padding, padding, padding)  # pad last dim by 1 on each side
+        x = F.pad(x, pd, "constant", 0)  # effectively zero padding
 
-    # Output shape
-    out_filters = x.shape[2] - kh + 1
-    out_timeframes = x.shape[3] - kw + 1
+        offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=self.kernel_size)
+        offsets = offset_layer(x)
 
-    weight = torch.rand(out_channels, mel_channels, kh, kw)
-    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
+        # Output shape
+        out_filters = x.shape[2] - kh + 1
+        out_timeframes = x.shape[3] - kw + 1
 
-    x = deform_conv2d(x, offsets, weight, mask=mask)
-    x = F.layer_norm(x, normalized_shape=x.shape)
+        weight = torch.rand(self.out_channels, mel_channels, kh, kw)
+        mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
 
-    # Activation
-    act = PRAK()
-    x = act(x)
+        x = deform_conv2d(x, offsets, weight, mask=mask)
+        x = F.layer_norm(x, normalized_shape=x.shape)
 
-    return x
+        # Activation
+        act = PRAK()
+        x = act(x)
+
+        return x
 
 
-def dpn_resblock(x, out_channels, kernel_size):
-    batch_size = x.shape[0]
-    in_channels = x.shape[1]
-    kh = kw = kernel_size
-    mel_channels = x.shape[1]
-    mel_timeframes = x.shape[3]
-    padding = kernel_size // 2
+class DPNResBlock(nn.Module):
+    def __init__(self, out_channels, kernel_size):
+        super(DPNResBlock, self).__init__()
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
 
-    x_addon = x
+    def forward(self, x):
+        batch_size = x.shape[0]
+        in_channels = x.shape[1]
+        kh = kw = self.kernel_size
+        mel_channels = x.shape[1]
+        mel_timeframes = x.shape[3]
+        padding = self.kernel_size // 2
 
-    pd = (padding, padding, padding, padding)  # pad last dim by 1 on each side
-    x = F.pad(x, pd, "constant", 0)  # effectively zero padding
+        x_addon = x.detach()
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        pd = (padding, padding, padding, padding)  # pad last dim by 1 on each side
+        x = F.pad(x, pd, "constant", 0)  # effectively zero padding
 
-    offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=kernel_size)
-    offsets = offset_layer(x)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Output shape
-    out_filters = x.shape[2] - kh + 1
-    out_timeframes = x.shape[3] - kw + 1
+        offset_layer = nn.Conv2d(in_channels, 2 * kh * kw, kernel_size=self.kernel_size)
+        offsets = offset_layer(x)
 
-    weight = torch.rand(out_channels, mel_channels, kh, kw)
-    mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
+        # Output shape
+        out_filters = x.shape[2] - kh + 1
+        out_timeframes = x.shape[3] - kw + 1
 
-    x = deform_conv2d(x, offsets, weight, mask=mask)
-    x = F.layer_norm(x, normalized_shape=x.shape)
+        weight = torch.rand(self.out_channels, mel_channels, kh, kw)
+        mask = torch.rand(batch_size, kh * kw, out_filters, out_timeframes)
 
-    # Activation
-    act = PRAK()
-    x = act(x)
+        x = deform_conv2d(x, offsets, weight, mask=mask)
+        x = F.layer_norm(x, normalized_shape=x.shape)
 
-    x = torch.cat([x, x_addon], dim=1)
+        # Activation
+        act = PRAK()
+        x = act(x)
 
-    pool_layer = nn.MaxPool2d(kernel_size=kernel_size, stride=2)
-    x = pool_layer(x)
+        x = torch.cat([x, x_addon], dim=1)
 
-    return x
+        pool_layer = nn.MaxPool2d(kernel_size=self.kernel_size, stride=2)
+        x = pool_layer(x)
+
+        return x
 
 
 # Generator Utilities
@@ -124,8 +136,14 @@ class DPNBlock(nn.Module):
         self.dpn_depth = params["dpn_depth"]
 
     def forward(self, x):
-        for i in range(1, self.dpn_depth + 1):
-            x = dpn_resblock(x, out_channels=self.out_channels * i, kernel_size=self.kernel_size)
+        dpn_resblocks = []
+        for i in range(self.dpn_depth):
+            layer = DPNResBlock(out_channels=self.out_channels * (i + 1), kernel_size=self.kernel_size)
+            dpn_resblocks.append(layer)
+
+        for block in dpn_resblocks:
+            x = block(x)
+
         return x
 
 
@@ -141,12 +159,16 @@ class MelInitiatorBlock(nn.Module):
         self.lstm_num_layers = params["lstm_num_layers"]
         self.input_shape = params["input_shape"]
 
+        # Deformable Conv 1
+        self.deformconv1 = DeformConvCustom(out_channels=self.out_channels // 2, kernel_size=self.kernel_size)
+        self.deformconv2 = DeformConvCustom(out_channels=self.out_channels, kernel_size=self.kernel_size)
+
     def forward(self, x):
         # Shape of X should be (batch_size, mel_channels, mel_filters, mel_timeframe)
 
         # Deformable convolution
-        x = deformconv(x, out_channels=self.out_channels, kernel_size=self.kernel_size)
-        x = deformconv(x, out_channels=self.out_channels, kernel_size=self.kernel_size)
+        x = self.deformconv1(x)
+        x = self.deformconv2(x)
         return x
 
 
@@ -231,6 +253,9 @@ class ProcessorBlock(nn.Module):
         self.kh = self.kernel_size
         self.kw = self.kernel_size
 
+        # Deformable Convolution
+        self.deformconv = DeformConvCustom(out_channels=self.out_channels, kernel_size=self.kernel_size)
+
         # MaxPool Layer for Downsample
         self.pool1 = nn.MaxPool2d(kernel_size=self.kernel_size, stride=2)
 
@@ -250,7 +275,7 @@ class ProcessorBlock(nn.Module):
 
     def forward(self, x):
         # Deformable convolution 1
-        x = deformconv(x, out_channels=self.out_channels, kernel_size=self.kernel_size)
+        x = self.deformconv(x)
 
         # Maxpooling 1
         x = self.pool1(x)

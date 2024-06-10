@@ -26,9 +26,9 @@
                     "defconv_in_channels": 1,
                     "defconv_out_channels": 16,
                     "kernel_size": 3,
-                    "kernel_list": [3, 5],
+                    "kernel_list": [3],
                     "stride": 1,
-                    "depth": 2
+                    "depth": 1
                 },
                 "params_final_msd": {
                     "kernel_size": 7,
@@ -45,9 +45,9 @@
                     "in_channels": 1,
                     "out_channels": 8,
                     "kernel_size": 3,
-                    "kernel_list": [3, 5],
+                    "kernel_list": [3],
                     "stride": 1,
-                    "depth": 2
+                    "depth": 1
                 },
                 "final_params": {
                     "in_features": 0,

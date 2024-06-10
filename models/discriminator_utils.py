@@ -2,32 +2,39 @@ import torch
 from torch import nn as nn
 import torch.nn.functional as F
 
-from models.generator_utils import DeConv1d, PRAK, dpn_resblock
+from models.generator_utils import DeConv1d, PRAK, DPNResBlock
 
 
-def msd_rescaling_layer(x, out_channels, kernel_size, padding, stride):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    x_addon = x
-    offsets = torch.randn(x.shape[0], 1, x.shape[-1] + 2 * padding - kernel_size + 1, kernel_size)
-    defconv1d = DeConv1d(in_channels=x.shape[1],
-                         out_channels=out_channels,
-                         kernel_size=kernel_size,
-                         padding=padding,
-                         stride=stride)
-    x = defconv1d(x, offsets)
+class MSDRescalingLayer(nn.Module):
+    def __init__(self, out_channels, kernel_size, padding, stride):
+        super(MSDRescalingLayer, self).__init__()
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.stride = stride
 
-    x = F.layer_norm(x, normalized_shape=x.shape)
+    def forward(self, x):
+        x_addon = x.detach()
+        offsets = torch.randn(x.shape[0], 1, x.shape[-1] + 2 * self.padding - self.kernel_size + 1, self.kernel_size)
+        defconv1d = DeConv1d(in_channels=x.shape[1],
+                             out_channels=self.out_channels,
+                             kernel_size=self.kernel_size,
+                             padding=self.padding,
+                             stride=self.stride)
+        x = defconv1d(x, offsets)
 
-    pool1 = nn.MaxPool1d(kernel_size=kernel_size,
-                         stride=stride,
-                         padding=padding)
-    x = pool1(x)
+        x = F.layer_norm(x, normalized_shape=x.shape)
 
-    prak1 = PRAK()
-    x = prak1(x)
+        pool1 = nn.MaxPool1d(kernel_size=self.kernel_size,
+                             stride=self.stride,
+                             padding=self.padding)
+        x = pool1(x)
 
-    x = torch.cat([x, x_addon], dim=1)
-    return x
+        prak1 = PRAK()
+        x = prak1(x)
+
+        x = torch.cat([x, x_addon], dim=1)
+        return x
 
 
 # Discriminator Utilities
@@ -59,11 +66,11 @@ class Distributor(nn.Module):
 
     def forward(self, x):
         for _ in range(self.depth):
-            x = msd_rescaling_layer(x,
-                                    out_channels=self.defconv_out_channels,
-                                    kernel_size=self.kernel_size,
-                                    padding=self.padding,
-                                    stride=self.stride)
+            rescale = MSDRescalingLayer(out_channels=self.defconv_out_channels,
+                                        kernel_size=self.kernel_size,
+                                        padding=self.padding,
+                                        stride=self.stride)
+            x = rescale(x)
 
             pool = nn.MaxPool1d(kernel_size=self.params["kernel_size"], stride=4)
             x = pool(x)
@@ -187,12 +194,15 @@ class Convolver(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size=self.params["kernel_size"], stride=2)
 
     def forward(self, x):
-        for _ in range(self.depth):
-            x = dpn_resblock(x,
-                             out_channels=self.params["out_channels"],
-                             kernel_size=self.params["kernel_size"])
-            self.params["in_channels"] = x.shape[1]
-            self.params["out_channels"] = x.shape[1] * 2
+        dpn_resblocks = []
+        for i in range(self.depth):
+            layer = DPNResBlock(out_channels=self.params["out_channels"], kernel_size=self.params["kernel_size"])
+            dpn_resblocks.append(layer)
+            self.params["in_channels"] = self.params["out_channels"]
+            self.params["out_channels"] = self.params["out_channels"] * 2
+
+        for block in dpn_resblocks:
+            x = block(x)
         return x
 
 
