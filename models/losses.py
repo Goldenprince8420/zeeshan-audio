@@ -112,7 +112,8 @@ class GeneratorLoss(nn.Module):
                                              discriminator_output_mcd_initiator_features_real,
                                              discriminator_output_mcd_convolver_features_generated,
                                              discriminator_output_mcd_convolver_features_real)
-        return adv_loss + self.lambda_fm * fm_loss + self.lambda_mel * mel_loss
+        gen_loss = adv_loss + self.lambda_fm * fm_loss + self.lambda_mel * mel_loss
+        return gen_loss, adv_loss, mel_loss, fm_loss
 
 
 def create_discriminator_label_disc(disc_op, type):
@@ -175,7 +176,9 @@ class DiscriminatorLoss(nn.Module):
                                               discriminator_output_mcd_real_label)
         mcd_loss = mcd_loss_real + mcd_loss_generated
 
-        return msd_loss + mcd_loss
+        disc_loss = msd_loss + mcd_loss
+
+        return disc_loss, msd_loss, mcd_loss
 
 
 # Mock discriminator class for feature extraction
