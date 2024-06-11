@@ -13,6 +13,7 @@ class MSDRescalingLayer(nn.Module):
         self.kernel_size = kernel_size
         self.padding = padding
         self.stride = stride
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def forward(self, x):
         x_addon = x.detach()
@@ -27,6 +28,7 @@ class MSDRescalingLayer(nn.Module):
         self.layer_norm = nn.LayerNorm(normalized_shape=x.shape)
         x = self.layer_norm(x)
 
+        x = torch.cat([x, x_addon], dim=1)
         pool1 = nn.MaxPool1d(kernel_size=self.kernel_size,
                              stride=self.stride,
                              padding=self.padding)
@@ -35,7 +37,7 @@ class MSDRescalingLayer(nn.Module):
         prak1 = PRAK()
         x = prak1(x)
 
-        x = torch.cat([x, x_addon], dim=1)
+        # x = torch.cat([x, x_addon], dim=1)
         return x
 
 

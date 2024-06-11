@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import numpy as np
-from dataset.data import AudioMNISTDataset, get_dataloader
+from dataset.data import AudioDataset, get_dataloader
 from run.train import do_train
 
 
@@ -34,11 +34,16 @@ def run(args):
 
     do_save = args.do_save
 
+    # Create output directory if it doesn't exist
+    if not os.path.exists(output_config["output_dir"]):
+        os.makedirs(output_config["output_dir"])
+
     data_dir = input_config["data_dir"]
     batch_size = data_config["batch_size"]
     shuffle = data_config["do_shuffle"]
 
-    audio_dataset = AudioMNISTDataset(data_path=data_dir)
+    audio_dataset = AudioDataset(data_path=data_dir,
+                                 data_config=data_config)
     audio_dataloader = get_dataloader(audio_dataset,
                                       batch_size=batch_size,
                                       shuffle=shuffle)

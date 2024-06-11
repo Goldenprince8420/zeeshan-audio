@@ -120,8 +120,8 @@ def process_data(data_dir, metadata_path):
 
 
 if __name__ == "__main__":
-    metadata_path = "../LJSpeech-1.1/LJSpeech-1.1/metadata.csv"
-    data_dir = "../LJSpeech-1.1/LJSpeech-1.1"
+    metadata_path = "../data/ljspeech/LJSpeech-1.1/metadata.csv"
+    data_dir = "../data/ljspeech/LJSpeech-1.1"
     process_data(data_dir=data_dir, metadata_path=metadata_path)
 
     # data_file = "../LJSpeech-1.1/LJSpeech-1.1/processed_data/LJ001-0002.npz"

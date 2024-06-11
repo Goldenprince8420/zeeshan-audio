@@ -71,6 +71,7 @@ def process_data(data_dir):
     # audio_dir = os.path.join("/".join(data_dir.split("/")[:-1]), "audio_dir")
     output_dir = os.path.join("/".join(data_dir.split("/")[:-1]), "processed_data")
     output_embedding_dir = os.path.join("/".join(data_dir.split("/")[:-1]), "text_embeddings")
+    MAX_LENGTH = 522320
 
     # Create output directory if it doesn't exist
     if not os.path.exists(output_dir):
@@ -85,6 +86,8 @@ def process_data(data_dir):
                 # Load audio file
                 audio_path = os.path.join(root, audio_file_name)
                 y, sr = sf.read(audio_path)
+                if y.shape[0] > MAX_LENGTH:
+                    MAX_LENGTH = y.shape[0]
 
                 # Calculate the amount of padding needed on each side
                 padding_left = (MAX_LENGTH - len(y)) // 2
@@ -98,17 +101,13 @@ def process_data(data_dir):
 
                 # Perform feature extraction (e.g., Mel spectrogram)
                 mel_spec = librosa.feature.melspectrogram(y=y, sr=sr)
-                # mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-
                 filename2 = filename.split(".")[0]
+
                 # Save audio data as numpy array
                 np.savez(file=os.path.join(output_dir, f"{filename2}.npz"),
                          metadata=embedding,
                          audio=y,
                          mel_spec=mel_spec)
-            #     pass
-            # elif filename.endswith(".txt"):
-            #     pass
 
 
 def process_metadata(data_dir):
@@ -132,13 +131,10 @@ def process_metadata(data_dir):
 
     # Create and save embeddings
     create_and_save_embeddings(extracted_text_dir, output_embedding_dir, model)
-
     print("Embedding Saved!")
 
 
 if __name__ == "__main__":
     # Example usage
-    data_dir = "../train-clean-100/LibriSpeech/train-clean-100"
-    # process_metadata(data_dir)
+    data_dir = "../data/librispeech/LibriSpeech/dev-clean"
     process_data(data_dir)
-    pass

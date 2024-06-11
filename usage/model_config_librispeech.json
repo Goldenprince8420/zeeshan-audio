@@ -7,11 +7,11 @@
                 "lstm_hidden_size": 64,
                 "lstm_num_layers": 2,
                 "dpn_depth": 3,
-                "audio_length": 47998,
+                "audio_length": 522720,
                 "input_shape": [1, 1]
             },
             "meta_initiator_params": {
-                "input_size": 152,
+                "input_size": 384,
                 "hidden_size": 64,
                 "output_size": 32
             }
@@ -38,8 +38,8 @@
             },
             "mcd_params": {
                 "initiator_params": {
-                    "height": 103,
-                    "width": 466
+                    "height": 720,
+                    "width": 726
                 },
                 "convolver_params": {
                     "in_channels": 1,

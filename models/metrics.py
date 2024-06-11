@@ -6,7 +6,7 @@ from scipy.io import wavfile
 import librosa
 
 
-def pesq(original_audio, degraded_audio, sample_rate):
+def pesq(original_audio, degraded_audio, sample_rate=48000):
     # Ensure both audios have the same length
     min_length = min(len(original_audio), len(degraded_audio))
     original_audio = original_audio[:min_length]
@@ -41,7 +41,7 @@ def pesq(original_audio, degraded_audio, sample_rate):
     return pesq_score
 
 
-def stoi(original_audio, degraded_audio, sample_rate, window_length=256, overlap=128):
+def stoi(original_audio, degraded_audio, sample_rate=48000, window_length=256, overlap=128):
     # Ensure both audios have the same length
     min_length = min(len(original_audio), len(degraded_audio))
     original_audio = original_audio[:min_length]
@@ -64,7 +64,7 @@ def stoi(original_audio, degraded_audio, sample_rate, window_length=256, overlap
     return stoi_score
 
 
-def warpq(original_audio, degraded_audio, sample_rate, window_length=256, overlap=128):
+def warpq(original_audio, degraded_audio, sample_rate=48000, window_length=256, overlap=128):
     # Ensure both audios have the same length
     min_length = min(len(original_audio), len(degraded_audio))
     original_audio = original_audio[:min_length]
@@ -86,7 +86,7 @@ def warpq(original_audio, degraded_audio, sample_rate, window_length=256, overla
     return warpq_score
 
 
-def fad(original_audio, degraded_audio, sample_rate, window_length=256, overlap=128):
+def fad(original_audio, degraded_audio, sample_rate=48000, window_length=256, overlap=128):
     # Ensure both audios have the same length
     min_length = min(len(original_audio), len(degraded_audio))
     original_audio = original_audio[:min_length]
@@ -152,64 +152,39 @@ def fdsd(audio1, audio2):
     return fdsd
 
 
-# if __name__ == "__main__":
-#     # Example usage:
-#     # Load your original and degraded audio files
-#     original_rate, original_audio = wavfile.read('../AudioMNIST/data/01/0_01_1.wav')
-#     degraded_rate, degraded_audio = wavfile.read('../AudioMNIST/data/15/0_15_1.wav')
-#
-#     # Resample degraded audio if necessary
-#     if original_rate != degraded_rate:
-#         degraded_audio = signal.resample(degraded_audio, len(original_audio))
-#
-#     # Compute PESQ score
-#     pesq_score = pesq(original_audio, degraded_audio, original_rate)
-#     print("PESQ score:", pesq_score)
-#
-#     # Compute STOI score
-#     stoi_score = stoi(original_audio, degraded_audio, original_rate)
-#     print("STOI score:", stoi_score)
-#
-#     # Compute WARP-Q score
-#     warpq_score = warpq(original_audio, degraded_audio, original_rate)
-#     print("WARP-Q score:", warpq_score)
-#
-#     # Compute FAD score
-#     fad_score = fad(original_audio, degraded_audio, original_rate)
-#     print("FAD score:", fad_score)
-#
-#     # MCD13
-#     # Example usage:
-#     # Load your audio sequences
-#     audio1, sr1 = librosa.load(
-#         "../AudioMNIST/data/01/0_01_1.wav")  # Replace "audio1.wav" with the path to your first audio sequence
-#     audio2, sr2 = librosa.load(
-#         "../AudioMNIST/data/01/0_01_1.wav")  # Replace "audio2.wav" with the path to your second audio sequence
-#
-#     # Resample the audio if needed
-#     if sr1 != sr2:
-#         audio1 = librosa.resample(audio1, sr1, sr2)
-#         sr1 = sr2
-#
-#     # Compute MCD13 score
-#     mcd13_score = compute_mcd13(audio1, audio2, sr=sr1)
-#     print("MCD13 score:", mcd13_score)
-#
-#     # Compute RMSE_fo score
-#     rmse_fo_score = compute_rmse_fo(audio1, audio2, sr=sr1)
-#     print("RMSE_fo score:", rmse_fo_score)
-#
-#     # FDSD
-#     data_file1 = "../AudioMNIST/preprocessed_data/0_1_0.npz"
-#     data_file2 = "../AudioMNIST/preprocessed_data/0_4_0.npz"
-#
-#     # Load the .npy file
-#     audio_data1 = np.load(data_file1)
-#     audio_data2 = np.load(data_file2)
-#
-#     audio1 = audio_data1["audio"]
-#     audio2 = audio_data2["audio"]
-#
-#     # Compute FDSD score
-#     fdsd_score = compute_fdsd(audio1, audio2)
-#     print("FDSD score:", fdsd_score)
+def calculate_metrics(generated_audio_path, real_audio_path):
+    generated_rate, generated_audio = wavfile.read(generated_audio_path)
+    real_rate, real_audio = wavfile.read(real_audio_path)
+
+    generated_audio = signal.resample(generated_audio, len(real_audio))
+
+    print(real_audio.shape, generated_audio.shape)
+
+    # Compute PESQ score
+    pesq_score = pesq(real_audio, generated_audio)
+    print("PESQ score:", pesq_score)
+
+    # Compute STOI score
+    stoi_score = stoi(real_audio, generated_audio)
+    print("STOI score:", stoi_score)
+
+    # Compute WARP-Q score
+    warpq_score = warpq(real_audio, generated_audio)
+    print("WARP-Q score:", warpq_score)
+
+    # Compute FAD score
+    fad_score = fad(real_audio, generated_audio)
+    print("FAD score:", fad_score)
+
+    # Compute FDSD score
+    fdsd_score = fdsd(real_audio, generated_audio)
+    print("FDSD score:", fdsd_score)
+
+
+if __name__ == "__main__":
+    # Example usage:
+    # Load your original and degraded audio files
+    generated_audio_path = '../data/ljspeech/LJ001-0001.wav'
+    real_audio_path = '../data/ljspeech/LJ001-0002.wav'
+
+    calculate_metrics(generated_audio_path, real_audio_path)

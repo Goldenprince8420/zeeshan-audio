@@ -1,5 +1,8 @@
+import os
+import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from models.models import Generator, Discriminator
 from models.losses import GeneratorLoss, DiscriminatorLoss
@@ -15,9 +18,10 @@ def do_train(dataloader,
     batch_size = data_config["batch_size"]
     audio_length = data_config["audio_length"]
 
-    rand_tensor = torch.randn([batch_size, 1, audio_length])
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device = torch.device('cpu')
+
+    rand_tensor = torch.randn([batch_size, 1, audio_length])
     params_generator = model_config["generator_params"]
     params_discriminator = model_config["discriminator_params"]
 
@@ -37,12 +41,16 @@ def do_train(dataloader,
                                    lr=run_config["discriminator_learning_rate"],
                                    betas=(0.5, 0.999))
 
+    generator_loss_epoch = []
+    discriminator_loss_epoch = []
+
     for epoch in range(epochs):
-        for i, (real_audio,
+        generator_loss_batch = 0
+        discriminator_loss_batch = 0
+
+        for (real_audio,
                 meta,
-                labels,
-                mel_spec,
-                mel_spec_db) in enumerate(dataloader):
+                mel_spec) in tqdm(dataloader):
             # Move data to device
             real_audio = real_audio
             real_audio = real_audio.transpose(1, 2)
@@ -51,6 +59,8 @@ def do_train(dataloader,
             x_meta = meta.transpose(1, 2).to(torch.float32)
 
             generated_audio = generator(x_mel, x_meta)
+            generated_audio_numpy = generated_audio.detach().numpy()
+
             # print("Generated Audio Shape: ", generated_audio.shape)
 
             # Concatenate generated and real audio
@@ -102,6 +112,7 @@ def do_train(dataloader,
                                       discriminator_output_msd_distributor_features_real,
                                       discriminator_output_mcd_initiator_features_real,
                                       discriminator_output_mcd_convolver_features_real)
+            generator_loss_batch += gen_loss.item()
 
             # BackProp
             gen_loss.backward(retain_graph=True)
@@ -116,11 +127,57 @@ def do_train(dataloader,
                                            discriminator_output_msd_real,
                                            discriminator_output_mcd_generated,
                                            discriminator_output_mcd_real)
+            discriminator_loss_batch += disc_loss.item()
+
             disc_loss.backward()
             optimizer_D.step()
-
             break
+
+        generator_loss_epoch.append(generator_loss_batch)
+        discriminator_loss_epoch.append(discriminator_loss_batch)
+
+        print()
+        print("Epoch: {} ; Generator Loss: {} ; Discriminator Loss: {}".format(epoch,
+                                                                               generator_loss_batch,
+                                                                               discriminator_loss_batch))
         break
+        # if epoch % 20 == 0:
+        #     print("Epoch: {} ; Generator Loss: {} ; Discriminator Loss: {}".format(epoch,
+        #                                                                            generator_loss_batch,
+        #                                                                            discriminator_loss_batch))
+
+    # i = 0
+    # real_audios = []
+    # generated_audios = []
+    #
+    # for (real_audio,
+    #      meta,
+    #      mel_spec) in tqdm(dataloader):
+    #     # Move data to device
+    #     real_audio = real_audio
+    #     real_audio = real_audio.transpose(1, 2)
+    #
+    #     x_mel = torch.unsqueeze(mel_spec, dim=1)
+    #     x_meta = meta.transpose(1, 2).to(torch.float32)
+    #
+    #     generated_audio = generator(x_mel, x_meta)
+    #
+    #     real_audios.append(real_audio.detach().numpy())
+    #     generated_audios.append(generated_audio.detach().numpy())
+    #     i += 1
+    #
+    #     if i > 100:
+    #         break
+    #
+    # epoch_losses_save_path = os.path.join(output_config["output_dir"], "epoch_losses.npz")
+    # np.savez(file=epoch_losses_save_path,
+    #          generator_losses=np.array(generator_loss_epoch),
+    #          discriminator_loss=np.array(discriminator_loss_epoch))
+    #
+    # audio_save_path = os.path.join(output_config["output_dir"], "audio_save_path.npz")
+    # np.savez(file=audio_save_path,
+    #          real_audio=real_audios,
+    #          generated_audio=generated_audios)
 
 
 if __name__ == "__main__":

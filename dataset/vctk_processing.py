@@ -84,10 +84,8 @@ def process_data(data_dir):
                          audio=y,
                          mel_spec=mel_spec)
 
-    # print("Data Processed!!")
-
 
 if __name__ == "__main__":
-    data_dir = "../VCTK/VCTK-Corpus/VCTK-Corpus"
+    data_dir = "../data/vctk/VCTK-Corpus/VCTK-Corpus"
     process_data(data_dir)
 

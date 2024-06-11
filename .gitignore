@@ -1,7 +1,9 @@
 .idea
 .ipynb_checkpoints
-AudioMNIST
 venv
+data
+Resources
+Results
 notes_for_paper.txt
 Proposed_Ideas.txt
 rough.py
@@ -10,5 +12,3 @@ model.ipynb
 new_model.ipynb
 analysis.ipynb
 information.txt
-data
-Resources
